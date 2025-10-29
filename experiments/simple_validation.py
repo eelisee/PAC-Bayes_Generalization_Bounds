@@ -200,18 +200,20 @@ def experiment_1_trajectory_length(out_file: Path):
     T_values = [20, 50, 100, 200]
     results = []
     
-    for T in T_values:
-        print(f"\nTesting T={T}...")
+    for idx, T in enumerate(T_values, 1):
+        print(f"\n[{idx}/{len(T_values)}] Testing T={T}... ({datetime.now().strftime('%H:%M:%S')})")
         result = run_single_experiment(T=T, c_Q=1.0, lambda_reg=0.01, m_hess=100)
         results.append(result)
         # Save result incrementally
         _atomic_append_json(_serialize_result(result), out_file)
 
+        print(f"  ✓ Completed in {datetime.now().strftime('%H:%M:%S')}")
         print(f"  Train risk: {result['train_risk']:.4f}")
         print(f"  Test risk: {result['test_risk']:.4f}")
         print(f"  Traj bound: {result['traj_bound']:.4f} (gap: {result['traj_gap']:.4f})")
         print(f"  Base bound: {result['base_bound']:.4f} (gap: {result['base_gap']:.4f})")
         print(f"  Improvement: {((result['base_gap'] - result['traj_gap']) / result['base_gap'] * 100):.1f}%")
+        print(f"  Saved to: {out_file}")
     
     # Plot
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
@@ -252,15 +254,17 @@ def experiment_2_posterior_scaling(out_file: Path):
     c_Q_values = [0.1, 0.5, 1.0, 2.0, 5.0]
     results = []
     
-    for c_Q in c_Q_values:
-        print(f"\nTesting c_Q={c_Q}...")
+    for idx, c_Q in enumerate(c_Q_values, 1):
+        print(f"\n[{idx}/{len(c_Q_values)}] Testing c_Q={c_Q}... ({datetime.now().strftime('%H:%M:%S')})")
         result = run_single_experiment(T=50, c_Q=c_Q, lambda_reg=0.01, m_hess=100)
         results.append(result)
         _atomic_append_json(_serialize_result(result), out_file)
 
+        print(f"  ✓ Completed in {datetime.now().strftime('%H:%M:%S')}")
         print(f"  Test risk: {result['test_risk']:.4f}")
         print(f"  Traj bound: {result['traj_bound']:.4f} (gap: {result['traj_gap']:.4f})")
         print(f"  Traj KL: {result['traj_kl']:.2f}")
+        print(f"  Saved to: {out_file}")
     
     # Plot
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
@@ -309,14 +313,16 @@ def experiment_3_hutchinson_samples(out_file: Path):
     m_values = [50, 100, 200, 500]
     results = []
     
-    for m in m_values:
-        print(f"\nTesting m={m}...")
+    for idx, m in enumerate(m_values, 1):
+        print(f"\n[{idx}/{len(m_values)}] Testing m={m}... ({datetime.now().strftime('%H:%M:%S')})")
         result = run_single_experiment(T=50, c_Q=1.0, lambda_reg=0.01, m_hess=m)
         results.append(result)
         _atomic_append_json(_serialize_result(result), out_file)
 
+        print(f"  ✓ Completed in {datetime.now().strftime('%H:%M:%S')}")
         print(f"  Traj bound: {result['traj_bound']:.4f} (gap: {result['traj_gap']:.4f})")
         print(f"  Trace(H_bar): {result['trace_H_bar']:.2f}")
+        print(f"  Saved to: {out_file}")
     
     # Plot
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
@@ -359,8 +365,13 @@ def main():
     else:
         out_file = Path(args.out)
 
+    start_time = datetime.now()
     print("\n" + "="*70)
     print("VALIDATION EXPERIMENTS - DIAGNOSING BOUND BEHAVIOR")
+    print("="*70)
+    print(f"Started at: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Output file: {out_file}")
+    print(f"Total configs to run: 4 + 5 + 4 = 13")
     print("="*70)
 
     # Run experiments (each saves incrementally to out_file)
@@ -368,10 +379,16 @@ def main():
     experiment_2_posterior_scaling(out_file)
     experiment_3_hutchinson_samples(out_file)
 
+    end_time = datetime.now()
+    duration = end_time - start_time
+    
     print("\n" + "="*70)
     print("ALL VALIDATION EXPERIMENTS COMPLETE")
     print("="*70)
-    print(f"\nResults are appended to: {out_file}")
+    print(f"Started:  {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Finished: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Duration: {duration}")
+    print(f"\nResults saved to: {out_file}")
     print("\nGenerated figures:")
     print("  - figures/validation_trajectory_length.png")
     print("  - figures/validation_posterior_scaling.png")
