@@ -1,0 +1,33 @@
+{
+  "data_dir": "./data",
+  "class_0": 0,
+  "class_1": 1,
+  "batch_size": 128,
+  "val_split": 0.15,
+  "flatten": true,
+  
+  "model_type": "logistic",
+  "model_kwargs": {},
+  
+  "epochs": 100,
+  "learning_rate": 0.01,
+  "optimizer": "sgd",
+  "record_every": 5,
+  
+  "lambda_reg": 0.01,
+  "c_Q": 1.0,
+  "use_diagonal_hessian": true,
+  "num_hessian_samples": 50,
+  "projection_dim": 10,
+  "num_hutchinson_samples": 100,
+  
+  "prior_variance": 1.0,
+  "baseline_posterior_variance": 0.01,
+  "delta": 0.05,
+  "epsilon_stochastic": 0.0,
+  
+  "seeds": [42, 43, 44, 45, 46],
+  "use_cuda": true,
+  
+  "_comment": "Default configuration for logistic regression on MNIST binary classification"
+}

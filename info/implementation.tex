@@ -1,0 +1,159 @@
+\section{Implementation Plan}
+
+In this section we describe in detail how we will implement the proposed method, how we will process and use the dataset(s), how we will design experiments, and how we will ensure reproducibility and satisfy the project instruction criteria (personal implementation, code, dataset, hyper‑parameter selection, plots, error bars, etc.).
+
+\subsection{Overview of Implementation Steps}
+
+We will carry out the following major steps:
+\begin{enumerate}[noitemsep]
+  \item Training a classification model and recording a parameter trajectory.
+  \item Estimating Hessian matrices (or stochastic approximations) along the trajectory.
+  \item Computing the trajectory‐averaged Hessian and defining the posterior covariance.
+  \item Decomposing the Gaussian KL divergence into top‑subspace alignment, residual complexity, and curvature terms.
+  \item Estimating stochastic trace and log‐determinant terms via the Hutchinson estimator.
+  \item Computing the proposed bound for each experimental run.
+  \item Conducting systematic experiments over hyper‐parameters (posterior scaling constant \(c_Q\), number of Hutchinson samples \(m\), trajectory length \(T\), projection dimension \(r\), regularization parameter \(\lambda\)).
+  \item Collecting results, plotting figures and tables (including error bars), and comparing with baseline bounds (standard PAC‑Bayes or Laplace bounds).
+  \item Packaging code with a detailed readme, linking to a GitHub repo, documenting what is original, what is adapted, and how to reproduce the results.
+\end{enumerate}
+
+\subsection{Detailed Steps and Formulas}
+
+\paragraph{1. Parameter Trajectory via Optimization.}  
+We train a classification model (for example, logistic regression or a small neural network) on the chosen dataset, using an optimizer such as SGD. Denote the parameter vector after \(t\) updates (or epochs) by:
+\[
+\widehat w_t,\quad t=1,2,\dots,T.
+\]
+We store the sequence \(\{\widehat w_t\}_{t=1}^T\) for subsequent curvature estimation.
+
+\paragraph{2. Hessian (or Approximate) Computation.}  
+At each step \(t\), we compute (or approximate) the Hessian of the empirical loss:
+\[
+H_t = \nabla^2 R_S(\widehat w_t),
+\]
+where
+\[
+R_S(w) = \frac1n\sum_{i=1}^n \ell(w;(x_i,y_i)).
+\]
+If full Hessian is too expensive, we may use a stochastic Hessian‐vector product approximation or sub‑sampled Hessian.
+
+\paragraph{3. Trajectory‐Averaged Hessian.}  
+Define
+\[
+\overline H_T = \frac1T \sum_{t=1}^T H_t.
+\]
+We then define the posterior covariance matrix:
+\[
+\Sigma_Q = c_Q^2 \big(\overline H_T + \lambda I\big)^{-1},
+\]
+with user‐specified constants \(c_Q>0\) and \(\lambda>0\) for stability.
+
+\paragraph{4. Gaussian Posterior KL Decomposition.}  
+Assume a Gaussian prior \(P = \mathcal N(\mu_P,\Sigma_P)\) and posterior \(Q = \mathcal N(\mu_Q,\Sigma_Q)\). Then
+\[
+\mathrm{KL}(Q\|P) = \frac12\Big[ \mathrm{tr}(\Sigma_P^{-1}\Sigma_Q) + (\mu_P-\mu_Q)^\top \Sigma_P^{-1}(\mu_P-\mu_Q) - d + \log\frac{\det \Sigma_P}{\det \Sigma_Q} \Big].
+\]
+We then decompose into:
+\[
+A_r = \|\Pi_r(\mu_Q-\mu_P)\|_{\Sigma_P^{-1}}^2,
+\qquad
+R_r = \mathrm{tr}(\Sigma_P^{-1}\Sigma_Q) - \mathrm{tr}(\Pi_r\Sigma_P^{-1}\Sigma_Q\Pi_r),
+\]
+and include a curvature term via:
+\[
+\widehat{\mathrm{FD}}_T = \frac1T \sum_{t=1}^T \frac1m \sum_{i=1}^m z_{t,i}^\top \log\big(I + \lambda^{-1} H_t\big)\,z_{t,i},\quad z_{t,i}\sim \mathcal N(0,I).
+\]
+Then the bound takes the form
+\[
+\mathbb E_{w\sim Q}[R(w)] \;\le\; R_S(Q) + \sqrt{ \frac{\mathrm{KL}(Q\|P) + \epsilon + \log(1/\delta) }{2n} }.
+\]
+Here \(\epsilon\) accounts for stochastic estimation errors.
+
+\paragraph{5. Hutchinson Estimator for Trace and Log‐Det.}  
+For a symmetric matrix \(M\in\mathbb R^{d\times d}\), the trace may be estimated via:
+\[
+\mathrm{tr}(M) \approx \frac1m\sum_{i=1}^m z_i^\top M z_i,\qquad z_i\sim\mathcal N(0,I).
+\]
+Similarly,
+\[
+\mathrm{tr}\big(\log(I+\lambda^{-1}H_t)\big) \approx \frac1m \sum_{i=1}^m z_i^\top \log(I+\lambda^{-1}H_t)\,z_i.
+\]
+In implementation we must choose \(m\) large enough to control variance (and report error bars).
+
+\subsection{Dataset Usage and Preprocessing}
+
+We will use the standard MNIST dataset as one of our experiments (and optionally a second tabular dataset). Some implementation details:
+
+\begin{itemize}[noitemsep]
+  \item The MNIST dataset comprises 60\,000 training images and 10\,000 testing images of handwritten digits (0–9), each image of size \(28\times28\) in grayscale.
+  \item We will treat it as a binary classification problem for simplicity (to match the course content’s binary‐classification focus). For example, we may select a subset of classes (e.g., digit “0” vs. “1”), or convert labels \(\{0,1\}\) vs.\ others.  
+  \item Data loading in Python (e.g., via Keras):  
+\[
+(x_{\text{train}},y_{\text{train}}),(x_{\text{test}},y_{\text{test}}) = \texttt{keras.datasets.mnist.load\_data()}
+\]
+with shapes \((60000,28,28)\), \((10000,28,28)\). 
+  \item Preprocessing steps:
+    \begin{itemize}[noitemsep]
+      \item Normalize pixel values to \([0,1]\), e.g.\ divide by 255.  
+      \item Flatten each image into a vector in \(\mathbb R^{784}\) for models like logistic regression, or keep \(28\times28\) shape for small neural networks.  
+      \item If using binary classification, map labels \(y_i\in\{0,1\}\) to e.g.\ class “0” vs class “1”, and discard other labels (or treat one‐vs‐rest).  
+      \item Split a validation set from training data for hyperparameter tuning / cross‐validation (e.g., take 10\,000 examples as validation).  
+    \end{itemize}
+  \item For our method, the dimension \(d\) of the parameter vector \(w\) will depend on the model chosen: e.g., for logistic regression on 784 features, \(d=784\).  
+  \item We will train the model, record \(\widehat w_t\) at each epoch or every \(K\) mini‐batches (e.g., every epoch), up to trajectory length \(T\).  
+  \item After training, we compute Hessians \(H_t\) along the trajectory (or approximate them) and compute \(\overline H_T\) for the bound computations.
+\end{itemize}
+
+\subsection{Hyper‐Parameter Tuning and Experimental Design}
+
+Key hyper‐parameters and experimental choices:
+
+\begin{itemize}[noitemsep]
+  \item Posterior scaling constant \(c_Q\): we will test a grid of values (e.g., \(c_Q\in\{0.1,\,1,\,10\}\)).  
+  \item Regularization parameter \(\lambda\) in \(\Sigma_Q=(\overline H_T+\lambda I)^{-1}\): test e.g.\ \(\lambda\in\{10^{-3},10^{-2},10^{-1}\}\).  
+  \item Projection dimension \(r\) for top‐subspace: test choices \(r\in\{10,50,100\}\) depending on \(d\).  
+  \item Hutchinson sample number \(m\): test e.g.\ \(m\in\{50,100,200\}\). Report the variance of the estimates and plot error bars.  
+  \item Trajectory length \(T\): test e.g.\ \(T\in\{50,100,200\}\) epochs (or snapshot counts) and compare bound tightness vs cost.  
+\end{itemize}
+
+We will cross‐validate hyper‐parameters on the validation set, and then report final results on the held‐out test set. For each setting we will compute the bound:
+\[
+\text{Bound} = R_S(Q) + \sqrt{\frac{\mathrm{KL}(Q\|P) + \epsilon + \log(1/\delta)}{2n}},
+\]
+and compare with the actual test risk \(R_{\text{test}} = \frac1{n_{\text{test}}}\sum_{i=1}^{n_{\text{test}}} \ell(w^*;x_i,y_i)\), where \(w^*=\mu_Q\) (for Gaussian posterior take mean). We will generate plots of bound vs actual risk, components of KL (top‐subspace, residual, curvature) as functions of \(c_Q,m,T\), etc.
+
+\subsection{Code, Reproducibility and Documentation}
+
+To meet the project instruction criteria:
+
+\begin{itemize}[noitemsep]
+  \item We will create a GitHub repository containing all code, scripts, data preprocessing, model‐training, Hessian estimation, bound computation, plotting.  
+  \item A detailed README will explain how to reproduce everything: dependencies (Python version, packages), how to download the dataset, how to run preprocessing, how to train the model, how to run bound estimation, how to generate figures and tables.  
+  \item We will clearly document which parts of the code are original (our Hessian extraction, KL decomposition, Hutchinson estimator integration) and which parts are adapted or inspired (e.g., standard logistic regression training). We will include comments or a separate “code‑notice” file.  
+  \item Our code will be modular (data loader, model trainer, trajectory recorder, Hessian estimator, bound calculator, experimental runner).  
+  \item All results (figures, tables) will include error bars for stochastic estimates (e.g., different random seeds, different Hutchinson runs), and we will report multiple runs (e.g., 5 seeds) to demonstrate variance.  
+  \item We will set a fixed random seed for reproducibility, use cross‐validation for hyperparameter selection, and keep separate train/validation/test splits.  
+\end{itemize}
+
+\subsection{Baseline Methods and Comparison}
+
+As required by the project instructions, we will implement one or more baseline methods to compare against our proposed bound:
+
+\begin{itemize}[noitemsep]
+  \item A classical PAC‐Bayes bound with a “simple” isotropic Gaussian posterior (no Hessian‐averaging).  
+  \item A Laplace approximation bound (posterior covariance equal to \((H + \lambda I)^{-1}\) at final parameter \(w^*\)).  
+  \item We will plot each bound across hyper‐parameter settings and compare their tightness and behaviour relative to actual test risk.  
+\end{itemize}
+
+\subsection{Potential Challenges and Mitigation}
+
+\begin{itemize}[noitemsep]
+  \item Hessian computation may be computationally expensive for high‑dimensional models. \emph{Mitigation:} use sub‑sampling, Hessian‐vector products, or restrict to smaller model (e.g., logistic regression or small MLP).  
+  \item The assumption of independence of Hessians along the trajectory is heuristic—this may affect concentration and bound tightness. We will report this explicitly in our write‑up (honesty requirement).  
+  \item The stochastic estimation (Hutchinson) may have high variance for small \(m\). \emph{Mitigation:} run multiple seeds, report error bars, and study how \(m\) affects variance.  
+  \item The bound may be loose in practice — this is acceptable as long as we explore and explain why (per instructions).  
+\end{itemize}
+
+\subsection{Summary}
+
+In summary, we will implement our method in a fully reproducible manner, adapt a standard dataset for binary classification, record parameter trajectories, estimate curvature, compute our trajectory‐aware PAC‑Bayes bound, compare with baselines, and document everything in code and report. The implementation meets the requirement of non trivial original code (Hessian estimation, KL decomposition, stochastic trace/log‑det estimation) and includes real‐data experiments with multiple figures/tables, error bars, cross‐validation, and hyper‐parameter exploration.

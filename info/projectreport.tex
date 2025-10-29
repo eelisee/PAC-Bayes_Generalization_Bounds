@@ -1,0 +1,159 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm,bm,enumitem,hyperref,graphicx}
+\usepackage[margin=1in]{geometry}
+\title{Trajectory-Aware PAC-Bayes Bounds: A Gentle Introduction and Project Plan}
+\author{Team Name}
+\date{}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{definition}{Definition}[section]
+\newtheorem{assumption}{Assumption}[section]
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This project investigates trajectory-aware PAC-Bayes bounds for high-dimensional models. 
+We start from binary classification and empirical risk minimization, motivate the need for generalization bounds, and gradually introduce PAC-Bayes theory in an accessible manner. 
+The project focuses on a Gaussian posterior decomposition into top-subspace alignment, residual complexity, and trajectory curvature, together with stochastic control of trace and log-determinant approximations. 
+We also provide an implementation plan and describe datasets for future experiments. 
+Empirical results are left as placeholders.
+\end{abstract}
+
+\section{Introduction}
+\subsection{What is Machine Learning?}
+Machine learning aims to learn patterns from data to make predictions on unseen examples. 
+A canonical example is binary classification: given data $\{(x_i,y_i)\}_{i=1}^n$ with $y_i \in \{0,1\}$, we want a function $f$ that predicts $y$ from $x$ as accurately as possible.
+
+\subsection{Empirical Risk Minimization (ERM)}
+Define a loss function $\ell(f(x),y)$ measuring prediction error. 
+The \emph{empirical risk} is the average loss on the training set:
+\[
+R_S(f) = \frac{1}{n}\sum_{i=1}^n \ell(f(x_i),y_i).
+\]
+ERM chooses the function $f$ minimizing $R_S(f)$:
+\[
+\hat f = \arg\min_{f\in \mathcal{F}} R_S(f).
+\]
+
+\subsection{Generalization and the Need for Bounds}
+Minimizing training error does not guarantee low error on new data:
+\[
+R(f) = \mathbb{E}_{(x,y)\sim \mathcal{D}}[\ell(f(x),y)].
+\]
+We need \emph{generalization bounds} that quantify how close $R_S(f)$ is to $R(f)$. 
+Classical tools include VC dimension, Rademacher complexity, and concentration inequalities.
+
+\section{PAC-Bayes Intuition}
+\subsection{From Deterministic to Randomized Predictors}
+Instead of choosing a single predictor $f$, PAC-Bayes considers a \emph{distribution over predictors}, called the \emph{posterior} $Q$. 
+We measure the expected risk under $Q$:
+\[
+R(Q) = \mathbb{E}_{f\sim Q}[R(f)].
+\]
+PAC-Bayes bounds relate $R(Q)$ to the empirical risk $R_S(Q)$ plus a term depending on the divergence between $Q$ and a \emph{prior} $P$.
+
+\subsection{The PAC-Bayes Bound (Simplified Form)}
+For any prior $P$ and posterior $Q$, with probability $1-\delta$ over the sample:
+\[
+R(Q) \le R_S(Q) + \sqrt{\frac{\mathrm{KL}(Q\|P)+\log\frac{1}{\delta}}{2n}}.
+\]
+Intuition:
+\begin{itemize}[noitemsep]
+\item $R_S(Q)$ measures fit to training data.
+\item $\mathrm{KL}(Q\|P)$ penalizes deviation from prior beliefs.
+\item More data ($n$ larger) tightens the bound.
+\end{itemize}
+
+\section{Gaussian Posteriors and KL Decomposition}
+\subsection{Gaussian Posterior}
+Suppose $P = \mathcal{N}(\mu_P,\Sigma_P)$ and $Q = \mathcal{N}(\mu_Q,\Sigma_Q)$. 
+The KL divergence can be written explicitly:
+\[
+\mathrm{KL}(Q\|P) = \frac{1}{2}\Big[ \mathrm{tr}(\Sigma_P^{-1}\Sigma_Q) + (\mu_P-\mu_Q)^\top \Sigma_P^{-1}(\mu_P-\mu_Q) - d + \log\frac{\det\Sigma_P}{\det\Sigma_Q}\Big].
+\]
+
+\subsection{Top-Subspace and Residual Decomposition}
+Let $V_r$ be the top-$r$ eigenvectors of $\Sigma_P$, and $\Pi_r = V_r V_r^\top$. Then:
+\begin{align*}
+\text{Top-subspace alignment: } & A_r = \|\Pi_r (\mu_Q-\mu_P)\|_{\Sigma_P^{-1}}^2,\\
+\text{Residual complexity: } & R_r = \mathrm{tr}(\Sigma_P^{-1}\Sigma_Q) - \mathrm{tr}(\Pi_r \Sigma_P^{-1}\Sigma_Q \Pi_r).
+\end{align*}
+This decomposition separates dominant directions from smaller variance directions, improving interpretability.
+
+\section{Trajectory-Averaged Curvature}
+\subsection{Motivation}
+When learning with stochastic optimization (e.g., SGD), the model parameters evolve along a trajectory $\{\hat w_t\}_{t=1}^T$. 
+Local curvature information from Hessians can refine the posterior:
+\[
+H_t = \nabla^2 R_S(\hat w_t).
+\]
+
+\subsection{Trajectory-Averaged Hessian}
+Define the trajectory-averaged Hessian:
+\[
+\bar H_T = \frac{1}{T}\sum_{t=1}^T H_t.
+\]
+This improves stability and captures typical curvature along optimization.
+
+\subsection{Posterior Covariance with Scaling}
+We define
+\[
+\Sigma_Q = c_Q^2 (\bar H_T + \lambda I)^{-1},
+\]
+where $c_Q$ is a scaling constant, $\lambda>0$ ensures numerical stability.
+
+\section{Stochastic Trace and Log-Determinant Estimation}
+\subsection{Hutchinson Estimator}
+For large matrices, direct computation of $\mathrm{tr}(H)$ or $\log\det(H)$ is costly. Hutchinson's method estimates traces with random vectors $z_i\sim \mathcal{N}(0,I)$:
+\[
+\mathrm{tr}(H) \approx \frac{1}{m}\sum_{i=1}^m z_i^\top H z_i.
+\]
+
+\subsection{Heuristic Log-Det Approximation}
+Similarly,
+\[
+\mathrm{tr}\log(I+\lambda^{-1} H) \approx \frac{1}{m}\sum_{i=1}^m z_i^\top \log(I+\lambda^{-1} H) z_i.
+\]
+This provides a practical method to compute curvature contributions to the KL decomposition.
+
+\section{Trajectory-Aware PAC-Bayes Bound (Summary)}
+Combining the above:
+\[
+R(Q) \le R_S(Q) + \sqrt{\frac{\mathrm{KL}(Q\|P) + \epsilon + \log\frac{1}{\delta}}{2n}},
+\]
+where $\epsilon$ accounts for stochastic estimation errors in trace/log-det.
+
+\section{Implementation Plan}
+\begin{enumerate}[noitemsep]
+\item Compute a parameter trajectory $\{\hat w_t\}$ using SGD.
+\item Estimate Hessians $H_t$ along the trajectory.
+\item Compute trajectory-averaged Hessian $\bar H_T$.
+\item Define Gaussian posterior $Q$ with covariance $\Sigma_Q$.
+\item Decompose KL into top-subspace, residual, and curvature terms.
+\item Estimate stochastic terms with Hutchinson estimator.
+\end{enumerate}
+
+\section{Datasets (to be introduced)}
+Planned datasets:
+\begin{itemize}[noitemsep]
+\item Synthetic binary classification dataset with known structure.
+\item Real dataset: e.g., MNIST or UCI tabular dataset.
+\end{itemize}
+Empirical experiments, figures, and tables will be added after implementation.
+
+\section{Discussion and Practical Guidance}
+\begin{itemize}[noitemsep]
+\item $c_Q$ balances KL tightness vs. stability.
+\item Top-$r$ projection simplifies analysis in high dimensions.
+\item Number of Hutchinson samples $m$ trades off computation and estimation error.
+\item Trajectory length $T$ affects stability; independence assumption is heuristic.
+\item The bound is valid for smooth losses; non-smooth losses require alternative curvature approximations.
+\end{itemize}
+
+\section{References}
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
