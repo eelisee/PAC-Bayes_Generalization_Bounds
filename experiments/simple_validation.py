@@ -6,7 +6,7 @@ Run the key validation experiments from the paper analysis:
 1. Trajectory length effect (T ∈ {20, 50, 100, 200})
 2. Posterior scaling effect (c_Q ∈ {0.1, 0.5, 1.0, 2.0, 5.0})
 3. Hutchinson samples effect (m ∈ {50, 100, 200, 500})
-"""
+""" 
 
 import numpy as np
 import json
